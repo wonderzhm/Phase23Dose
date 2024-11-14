@@ -19,10 +19,9 @@ getZstat <- function(dat, w = NULL, selected, targetEvents, test.method = "dunne
   # cut data
   d <- dat %>% filter(.data$trt%in%c(0, selected))
   dIA <- cut_by_event(d, targetEvents = targetEvents)
-  res <- nph::logrank.test(time = dIA$survTimeCut, event = dIA$eventCut,
-                           group = as.factor(dIA$trt), alternative = c("greater"),
-                           rho = 0, gamma = 0, event_time_weights = NULL)
-  ZIA <- res$test$z # non-adjusted Z statistic
+  res <- logrank.one.sided(time = dIA$survTimeCut, event = dIA$eventCut,
+                           group = as.factor(dIA$trt))
+  ZIA <- res$z # non-adjusted Z statistic
   IA_time <- dIA$calendarCutoff[1]
   obsEventsIA <- sum(dIA$eventCut)
   # stage 1:
@@ -31,10 +30,9 @@ getZstat <- function(dat, w = NULL, selected, targetEvents, test.method = "dunne
   pvalues <- rep(NA, num_trt)
   for(i in 1:num_trt){
     d1IAi <- d1IA %>% filter(.data$trt%in%c(0, i))
-    res <- nph::logrank.test(time = d1IAi$survTimeCut, event = d1IAi$eventCut,
-                             group = as.factor(d1IAi$trt), alternative = c("greater"),
-                             rho = 0, gamma = 0, event_time_weights = NULL)
-    pvalues[i] <- res$test$p
+    res <- logrank.one.sided(time = d1IAi$survTimeCut, event = d1IAi$eventCut,
+                             group = as.factor(d1IAi$trt))
+    pvalues[i] <- res$p
   }
   names(pvalues) <- paste("H", 1:num_trt, sep = "")
   g <- matrix(1/(num_trt-1), nrow = num_trt, ncol = num_trt)
@@ -55,10 +53,9 @@ getZstat <- function(dat, w = NULL, selected, targetEvents, test.method = "dunne
   ZIA_1 <- qnorm(1-max(padjusted)) # adjusted Z statistic for stage 1 subjects
   # stage 2:
   d2IA <- dIA %>% filter(.data$stage==2)
-  res <- nph::logrank.test(time = d2IA$survTimeCut, event = d2IA$eventCut,
-                           group = as.factor(d2IA$trt), alternative = c("greater"),
-                           rho = 0, gamma = 0, event_time_weights = NULL)
-  ZIA_2 <- res$test$z # Z statistics for stage 2 subjects, no adjustment needed
+  res <- logrank.one.sided(time = d2IA$survTimeCut, event = d2IA$eventCut,
+                           group = as.factor(d2IA$trt))
+  ZIA_2 <- res$z # Z statistics for stage 2 subjects, no adjustment needed
   # p-value combination
   if(is.null(w)) w <- sqrt(obsEventsIA_1/obsEventsIA)
   ZIA_tilde <- w*ZIA_1 + sqrt(1-w^2)*ZIA_2

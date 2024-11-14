@@ -87,10 +87,9 @@ getOC_ph23 <- function(ith = 1, seed = 2024, nsim = 1000, test.method = "dunnett
       pvalues <- rep(NA, num_trt)
       for(i in 1:num_trt){
         d1IAi <- d1IAd %>% filter(.data$trt%in%c(0, i))
-        res <- nph::logrank.test(time = d1IAi$survTimeCut, event = d1IAi$eventCut,
-                                 group = as.factor(d1IAi$trt), alternative = c("greater"),
-                                 rho = 0, gamma = 0, event_time_weights = NULL)
-        pvalues[i] <- res$test$p
+        res <- logrank.one.sided(time = d1IAi$survTimeCut, event = d1IAi$eventCut,
+                                 group = as.factor(d1IAi$trt))
+        pvalues[i] <- res$p
       }
       selected <- which.min(pvalues)
     }
@@ -143,10 +142,9 @@ getOC_ph23 <- function(ith = 1, seed = 2024, nsim = 1000, test.method = "dunnett
         dFA <- cut_by_event(d, targetEvents = targetEventsFA_all)
         FA_time <- dFA$calendarCutoff[1]
         obsEventsFA <- sum(dFA$eventCut)
-        res <- nph::logrank.test(time =dFA$survTimeCut, event = dFA$eventCut,
-                                 group = as.factor(dFA$trt), alternative = c("greater"),
-                                 rho = 0, gamma = 0, event_time_weights = NULL)
-        z_FA <- res$test$z
+        res <- logrank.one.sided(time = dFA$survTimeCut, event = dFA$eventCut,
+                                 group = as.factor(dFA$trt))
+        z_FA <- res$z
         z_FA_tilde <- z_FA + sqrt(obsEventsIA/obsEventsFA)*(z_IA_tilde-z_IA)
         FA_sample_size <- nrow(dFA) + (num_trt-1)*n1_per_arm
         obs_cor <- sqrt(obsEventsIA/obsEventsFA)

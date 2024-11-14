@@ -1,7 +1,7 @@
 Package: Phase23Dose
 Type: Package
 Title: Inferential Seamless Phase 2/3 Design for Oncology Dose Optimization Trials
-Version: 0.1.2
+Version: 0.1.3
 Author: Haiming Zhou and Philip He
 Maintainer: Haiming Zhou <haiming2019@gmail.com>
 Description: Provide design parameters and operating characteristics for inferential seamless phase 2/3 oncology dose optimization trials.
@@ -10,4 +10,4 @@ Encoding: UTF-8
 LazyData: true
 RoxygenNote: 7.3.2
 Imports: 
-    gsDesign, gMCP, rlang, magrittr, dplyr, simtrial, mvtnorm, nph
+    gsDesign, gMCP, rlang, magrittr, dplyr, simtrial, mvtnorm, survival

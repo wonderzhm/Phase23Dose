@@ -23,10 +23,9 @@ getZ1 <- function(dat, w = NULL, selected = 1, targetEvents, test.method = "dunn
   pvalues <- rep(NA, num_trt)
   for(i in 1:num_trt){
     d1IAi <- d1IAd %>% filter(.data$trt%in%c(0, i))
-    res <- nph::logrank.test(time = d1IAi$survTimeCut, event = d1IAi$eventCut,
-                             group = as.factor(d1IAi$trt), alternative = c("greater"),
-                             rho = 0, gamma = 0, event_time_weights = NULL)
-    pvalues[i] <- res$test$p
+    res <- logrank.one.sided(time = d1IAi$survTimeCut, event = d1IAi$eventCut,
+                             group = as.factor(d1IAi$trt))
+    pvalues[i] <- res$p
   }
   names(pvalues) <- paste("H", 1:num_trt, sep = "")
   g <- matrix(1/(num_trt-1), nrow = num_trt, ncol = num_trt)
@@ -51,10 +50,9 @@ getZ1 <- function(dat, w = NULL, selected = 1, targetEvents, test.method = "dunn
   dIA1 <- cut_by_event(d, targetEvents = targetEvents)
   IA1_time <- dIA1$calendarCutoff[1]
   obsEventsIA1 <- sum(dIA1$eventCut)
-  res <- nph::logrank.test(time = dIA1$survTimeCut, event = dIA1$eventCut,
-                           group = as.factor(dIA1$trt), alternative = c("greater"),
-                           rho = 0, gamma = 0, event_time_weights = NULL)
-  Z1 <- res$test$z
+  res <- logrank.one.sided(time = dIA1$survTimeCut, event = dIA1$eventCut,
+                           group = as.factor(dIA1$trt))
+  Z1 <- res$z
   # combine using independent incremental
   if(is.null(w)) w <- sqrt(obsEventsIAd/obsEventsIA1)
   Z1_tilde <- w*Zd_tilde + sqrt(1-w^2)*(sqrt(obsEventsIA1)*Z1-sqrt(obsEventsIAd)*Zd)/
