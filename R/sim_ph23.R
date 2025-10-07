@@ -4,17 +4,19 @@
 #' and only the selected arm and control arm will go into stage 2. Since we don't know the arm selection in
 #' advance, we will simulated patients for all arms in stage 2 but with adjusted accrual rate assuming stage 2
 #' only contains the selected arm and the control.
-#' @param hazardC hazard rate for control arm
-#' @param hazardT vector of hazard rates for treatment arms
-#' @param orrC ORR for control arm
-#' @param orrT vector of ORRs for control arm
+#' @param n1 total number of subjects to be enrolled in stage 1 for control and treatment arms, where
+#' the number of treatment arms can be greater than 2.
+#' @param n2 total number of subjects to be enrolled in stage 2 for control and the selected treatment arm.
+#' @param duration1 enrollment duration in months for stage 1; must be an integer.
+#' @param duration2 enrollment duration in months for stage 2; must be an integer.
+#' @param enrollment_hold holding period in month after stage 1 enrollment prior to enrollment of stage 2 patients.
+#' 0 means seamless enrollment.
+#' @param hazard hazard rate for control and treatment arms.
+#' @param orr ORR for control and treatment arms.
 #' @param rho the correlation between ORR and survival based on Gaussian copula.
-#' @param accrual_rate_stage1 number of subjects enrolled per month for stage 1.
-#' @param accrual_rate_stage2 number of subjects enrolled per month for stage 2.
-#' @param n1_per_arm total number of subjects per arm in stage 1.
-#' @param n2_per_arm total number of subjects per arm in stage 2.
-#' @param dropoutC dropout hazard rate for control.
-#' @param dropoutT vector of dropout hazard rates for treatment arms.
+#' @param dropout dropout hazard rate for control and treatment arms.
+#' @param a1 weight parameter in cumulative enrollment pattern for stage 1. When \code{a=1}, it is uniform.
+#' @param a2 weight parameter in cumulative enrollment pattern for stage 2. When \code{a=1}, it is uniform.
 #'
 #' @return A time-to-event dataset consists of
 #' \itemize{
@@ -27,61 +29,55 @@
 #' \item \code{calendarTime}: total time on study, i.e. \code{enterTime} + \code{survTime}.
 #' }
 #' @importFrom rlang .data
-#' @importFrom dplyr mutate
+#' @importFrom dplyr mutate arrange bind_rows
 #' @importFrom stats pnorm qnorm rexp
-#' @importFrom simtrial rpwexp_enroll
 #' @importFrom mvtnorm rmvnorm
 #' @export
 #'
 #' @examples
-#' d <- sim_ph23(n1_per_arm = 20, n2_per_arm = 30)
+#' d <- sim_ph23(n1 = c(50, 50, 50, 50), n2 = c(150, 150))
 #' head(d)
-sim_ph23 <- function(hazardC = 0.1, hazardT = c(0.09, 0.08, 0.07),
-                     orrC = 0.2, orrT = c(0.25, 0.30, 0.40), rho = 0.7,
-                     accrual_rate_stage1 = 25, accrual_rate_stage2 = 25,
-                     n1_per_arm = 50, n2_per_arm = 150,
-                     dropoutC = 0, dropoutT = c(0, 0, 0)){
-  ## Simulate survival times and tumor responses
-  num_trt <- length(hazardT)
-  n_per_arm <- n1_per_arm + n2_per_arm
-  trt <- rep(0:num_trt, each = n_per_arm)
-  ntotal <- length(trt)
-  z <- rmvnorm(n=ntotal, mean=c(0,0), sigma=matrix(c(1, rho, rho, 1), 2, 2))
-  z_surv <- z[,1]
-  z_orr <- z[,2]
-  exp_rates <- rep(c(hazardC, hazardT), each = n_per_arm)
-  orrs <- rep(c(orrC, orrT), each = n_per_arm)
-  surv_time <- -pnorm(q = z_surv, log.p = TRUE)/exp_rates
-  response <- (z_orr <= qnorm(orrs))+0
-  drop_rates <- rep(c(dropoutC, dropoutT), each = n_per_arm)
-  drop_rates[drop_rates<=0] <- 1e-10
-  cen_time <- rexp(ntotal, rate = drop_rates)
+sim_ph23 <- function(n1 = c(50, 50, 50, 50), n2 = c(150, 150),
+                     duration1 = 8, duration2 = 12, enrollment_hold = 5,
+                     hazard = c(0.1, 0.09, 0.08, 0.07),
+                     orr = c(0.2, 0.25, 0.30, 0.40), rho = 0.7,
+                     dropout = c(0, 0, 0, 0), a1 = 1, a2 = 1){
+  ## number of treatment arms
+  narms <- length(n1)
 
-  ## Simulate enrollment
-  ## Stage 1: 50 patients per arm at rate 25 patients per month
-  enroll_time <- rep(NA, ntotal)
-  stage <- rep( c(rep(1, n1_per_arm), rep(2, n2_per_arm)), num_trt+1)
-  stage1.indx <- which(stage==1)
-  stage1.size <- length(stage1.indx)
-  stage1.enroll <- rpwexp_enroll(
-    n = stage1.size, enroll_rate = data.frame(
-      duration = c(n1_per_arm*(num_trt+1)/accrual_rate_stage1),
-      rate = accrual_rate_stage1))
-  enroll_time[stage1.indx] <- sample(stage1.enroll)
-  stage2.indx <- which(stage==2)
-  stage2.size <- length(stage2.indx)
-  stage2.enroll <- rpwexp_enroll(
-    n = stage2.size, enroll_rate = data.frame(
-      duration = c(n2_per_arm*2/accrual_rate_stage2),
-      rate = accrual_rate_stage2/2*(num_trt+1))) + max(stage1.enroll)
-  enroll_time[stage2.indx] <- sample(stage2.enroll)
+  ## simulate stage 1 data
+  # control arm
+  d1 <- sim_single_arm(n = n1[1], duration = duration1, hazard = hazard[1],
+                       orr = orr[1], rho = rho, dropout = dropout[1], a = a1) %>%
+    mutate(stage = 1, trt = 0, .before = .data$enterTime)
+  # treatment arms
+  for(i in 2:narms){
+    di <- sim_single_arm(n = n1[i], duration = duration1, hazard = hazard[i],
+                         orr = orr[i], rho = rho, dropout = dropout[i], a = a1) %>%
+      mutate(stage = 1, trt = i-1, .before = .data$enterTime)
+    d1 <- bind_rows(d1, di)
+  }
+  d1 <- d1 %>% arrange(enterTime)
+
+  ## simulate stage 2 data
+  # control arm
+  d2 <- sim_single_arm(n = n2[1], duration = duration2, hazard = hazard[1],
+                       orr = orr[1], rho = rho, dropout = dropout[1], a = a2) %>%
+    mutate(enterTime = .data$enterTime + duration1 + enrollment_hold) %>%
+    mutate(calendarTime = .data$enterTime + .data$survTime) %>%
+    mutate(stage = 2, trt = 0, .before = .data$enterTime)
+  # treatment arms
+  for(i in 2:narms){
+    di <- sim_single_arm(n = n2[2], duration = duration2, hazard = hazard[i],
+                         orr = orr[i], rho = rho, dropout = dropout[i], a = a2) %>%
+      mutate(enterTime = .data$enterTime + duration1 + enrollment_hold) %>%
+      mutate(calendarTime = .data$enterTime + .data$survTime) %>%
+      mutate(stage = 2, trt = i-1, .before = .data$enterTime)
+    d2 <- bind_rows(d2, di)
+  }
+  d2 <- d2 %>% arrange(enterTime)
 
   ## Combine the data
-  d <- data.frame(stage = stage, trt = trt, response = response, enterTime = enroll_time,
-                    surv_time = surv_time, cen_time = cen_time) %>%
-    mutate(survTime = ifelse(surv_time<=cen_time, surv_time, cen_time)) %>%
-    mutate(calendarTime = .data$enterTime + .data$survTime) %>%
-    mutate(event = ifelse(surv_time<=cen_time, 1, 0)) %>%
-    dplyr::select(-surv_time, -cen_time)
+  d <- bind_rows(d1, d2)
   return(d)
 }

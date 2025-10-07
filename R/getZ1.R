@@ -1,6 +1,7 @@
 #' Get test statistic value using independent incremental approach
 #'
 #' @param dat A time-to-event dataset returned from \link{sim_ph23}.
+#' @param IAd_time the data cutoff time for dose selection.
 #' @param w weight parameter for stage 1 data.
 #' @param selected The selected dose level.
 #' @param targetEvents The target number of events from both stages at which analysis is to be made.
@@ -12,13 +13,12 @@
 #' @export
 #'
 #' @examples
-#' d <- sim_ph23(n1_per_arm = 20, n2_per_arm = 30)
-#' getZ1(d, selected = 2, targetEvents = 25, test.method="dunnett")
-getZ1 <- function(dat, w = NULL, selected = 1, targetEvents, test.method = "dunnett"){
+#' d <- sim_ph23(n1 = c(20, 20, 20, 20), n2 = c(30, 30), duration1 = 4, enrollment_hold = 5)
+#' getZ1(d, IAd_time = 13, selected = 2, targetEvents = 30, test.method="dunnett")
+getZ1 <- function(dat, IAd_time, w = NULL, selected = 1, targetEvents, test.method = "dunnett"){
   num_trt <- length(unique(dat$trt)) - 1
   # stage 1:
   d1 <- dat %>% filter(.data$stage==1);
-  IAd_time <- max(d1$enterTime) + 1e-10
   d1IAd <- cut_by_date(d1, cut_time = IAd_time)
   pvalues <- rep(NA, num_trt)
   for(i in 1:num_trt){

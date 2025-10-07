@@ -4,10 +4,19 @@
 \alias{getZ1}
 \title{Get test statistic value using independent incremental approach}
 \usage{
-getZ1(dat, w = NULL, selected = 1, targetEvents, test.method = "dunnett")
+getZ1(
+  dat,
+  IAd_time,
+  w = NULL,
+  selected = 1,
+  targetEvents,
+  test.method = "dunnett"
+)
 }
 \arguments{
 \item{dat}{A time-to-event dataset returned from \link{sim_ph23}.}
+
+\item{IAd_time}{the data cutoff time for dose selection.}
 
 \item{w}{weight parameter for stage 1 data.}
 
@@ -25,6 +34,6 @@ observed number of events from stage 1 and \code{cut_time} the data cut time.
 Get test statistic value using independent incremental approach
 }
 \examples{
-d <- sim_ph23(n1_per_arm = 20, n2_per_arm = 30)
-getZ1(d, selected = 2, targetEvents = 25, test.method="dunnett")
+d <- sim_ph23(n1 = c(20, 20, 20, 20), n2 = c(30, 30), duration1 = 4, enrollment_hold = 5)
+getZ1(d, IAd_time = 13, selected = 2, targetEvents = 30, test.method="dunnett")
 }

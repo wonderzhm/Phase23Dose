@@ -1,0 +1,18 @@
+"0","rm(list=ls())"
+"0","library(knitr)"
+"0","library(gsDesign)"
+"0","library(dplyr)"
+"0","library(rpact)"
+"0","library(ggplot2)"
+"2","Warning: package ‘ggplot2’ was built under R version 4.4.3"
+"0","library(ggh4x)"
+"0","library(ggpubr)"
+"0","library(scales)"
+"2","Warning: package ‘scales’ was built under R version 4.4.3"
+"0","library(parallel)"
+"0","library(doParallel)"
+"2","Loading required package: foreach
+"
+"2","Loading required package: iterators
+"
+"0","library(Phase23Dose)"

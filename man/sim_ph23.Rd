@@ -5,41 +5,43 @@
 \title{Simulate a seamless phase 2/3 trial}
 \usage{
 sim_ph23(
-  hazardC = 0.1,
-  hazardT = c(0.09, 0.08, 0.07),
-  orrC = 0.2,
-  orrT = c(0.25, 0.3, 0.4),
+  n1 = c(50, 50, 50, 50),
+  n2 = c(150, 150),
+  duration1 = 8,
+  duration2 = 12,
+  enrollment_hold = 5,
+  hazard = c(0.1, 0.09, 0.08, 0.07),
+  orr = c(0.2, 0.25, 0.3, 0.4),
   rho = 0.7,
-  accrual_rate_stage1 = 25,
-  accrual_rate_stage2 = 25,
-  n1_per_arm = 50,
-  n2_per_arm = 150,
-  dropoutC = 0,
-  dropoutT = c(0, 0, 0)
+  dropout = c(0, 0, 0, 0),
+  a1 = 1,
+  a2 = 1
 )
 }
 \arguments{
-\item{hazardC}{hazard rate for control arm}
+\item{n1}{total number of subjects to be enrolled in stage 1 for control and treatment arms, where
+the number of treatment arms can be greater than 2.}
 
-\item{hazardT}{vector of hazard rates for treatment arms}
+\item{n2}{total number of subjects to be enrolled in stage 2 for control and the selected treatment arm.}
 
-\item{orrC}{ORR for control arm}
+\item{duration1}{enrollment duration in months for stage 1; must be an integer.}
 
-\item{orrT}{vector of ORRs for control arm}
+\item{duration2}{enrollment duration in months for stage 2; must be an integer.}
+
+\item{enrollment_hold}{holding period in month after stage 1 enrollment prior to enrollment of stage 2 patients.
+0 means seamless enrollment.}
+
+\item{hazard}{hazard rate for control and treatment arms.}
+
+\item{orr}{ORR for control and treatment arms.}
 
 \item{rho}{the correlation between ORR and survival based on Gaussian copula.}
 
-\item{accrual_rate_stage1}{number of subjects enrolled per month for stage 1.}
+\item{dropout}{dropout hazard rate for control and treatment arms.}
 
-\item{accrual_rate_stage2}{number of subjects enrolled per month for stage 2.}
+\item{a1}{weight parameter in cumulative enrollment pattern for stage 1. When \code{a=1}, it is uniform.}
 
-\item{n1_per_arm}{total number of subjects per arm in stage 1.}
-
-\item{n2_per_arm}{total number of subjects per arm in stage 2.}
-
-\item{dropoutC}{dropout hazard rate for control.}
-
-\item{dropoutT}{vector of dropout hazard rates for treatment arms.}
+\item{a2}{weight parameter in cumulative enrollment pattern for stage 2. When \code{a=1}, it is uniform.}
 }
 \value{
 A time-to-event dataset consists of
@@ -60,6 +62,6 @@ advance, we will simulated patients for all arms in stage 2 but with adjusted ac
 only contains the selected arm and the control.
 }
 \examples{
-d <- sim_ph23(n1_per_arm = 20, n2_per_arm = 30)
+d <- sim_ph23(n1 = c(50, 50, 50, 50), n2 = c(150, 150))
 head(d)
 }

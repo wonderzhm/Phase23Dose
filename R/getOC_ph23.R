@@ -1,24 +1,26 @@
 #' Get operating characteristics via simulations for the phase 2/3 design
 #'
-#' @param ith ith cluster used for parallel computing
-#' @param seed random seed for reproducibility
 #' @param nsim number of replicates
 #' @param test.method method for getting adjusted p-value: \code{"dunnett"} or \code{"simes"}.
 #' @param approach approach for combining data:
 #' \code{"disjoint"}: disjoint-subjects approach;
-#' \code{"ii"}: independent incremental approach;
-#' \code{"hybrid"}: disjoint-subjects at IA and independent incremental thereafter.
-#' @param hazardC hazard rate for control arm
-#' @param hazardT vector of hazard rates for treatment arms
-#' @param orrC ORR for control arm
-#' @param orrT vector of ORRs for control arm
+#' \code{"ii"}: independent incremental approach.
+#' @param n1 total number of subjects to be enrolled in stage 1 for control and treatment arms, where
+#' the number of treatment arms can be greater than 2.
+#' @param n2 total number of subjects to be enrolled in stage 2 for control and the selected treatment arm.
+#' @param duration1 enrollment duration in months for stage 1; must be an integer.
+#' @param duration2 enrollment duration in months for stage 2; must be an integer.
+#' @param enrollment_hold holding period in month after stage 1 enrollment prior to enrollment of stage 2 patients.
+#' 0 means seamless enrollment.
+#' @param hazard hazard rate for control and treatment arms.
+#' @param orr ORR for control and treatment arms.
 #' @param rho the correlation between ORR and survival based on Gaussian copula.
-#' @param dropoutC dropout hazard rate for control.
-#' @param dropoutT vector of dropout hazard rates for treatment arms.
-#' @param accrual_rate_stage1 number of subjects enrolled per month for stage 1.
-#' @param accrual_rate_stage2 number of subjects enrolled per month for stage 2.
-#' @param n1_per_arm total number of subjects per arm in stage 1.
-#' @param n2_per_arm total number of subjects per arm in stage 2.
+#' @param dropout dropout hazard rate for control and treatment arms.
+#' @param a1 weight parameter in cumulative enrollment pattern for stage 1. When \code{a=1}, it is uniform.
+#' @param a2 weight parameter in cumulative enrollment pattern for stage 2. When \code{a=1}, it is uniform.
+#' @param min_followup minimum follow-up in month for stage 1 before dose selection. It should be smaller than
+#' \code{enrollment_hold}. For example, a reasonable choice is \code{min_followup = 4} with \code{enrollment_hold=5}
+#' which gives us at least 4 months follow-up for stage 1 patients and 1 month for dose selection.
 #' @param targetEventsIA_all target number of events at IA for all subjects from both stage 1 and 2.
 #' @param targetEventsFA_all target number of events at FA for all subjects from both stage 1 and 2.
 #' @param w weights parameter for stage 1 data: for independent incremental approach, it will be length of 1;
@@ -40,14 +42,15 @@
 #' @export
 #'
 #' @examples
-#' res <- getOC_ph23(seed = 24232, nsim=10)
-#' apply(res, 2, mean, rm=TRUE)
-getOC_ph23 <- function(ith = 1, seed = 2024, nsim = 1000, test.method = "dunnett",
-                       approach = "disjoint", hazardC = 0.1, hazardT = c(0.1, 0.1, 0.1),
-                       orrC = 0.2, orrT = c(0.2, 0.2, 0.2), rho = 0.7,
-                       dropoutC = 0, dropoutT = c(0, 0, 0),
-                       accrual_rate_stage1 = 25, accrual_rate_stage2 = 25,
-                       n1_per_arm = 50, n2_per_arm = 150,
+#' res <- getOC_ph23(nsim=10)
+#' apply(res, 2, mean, na.rm=TRUE)
+getOC_ph23 <- function(nsim = 1000, test.method = "dunnett",
+                       approach = "disjoint", n1 = c(50, 50, 50, 50), n2 = c(150, 150),
+                       duration1 = 8, duration2 = 12, enrollment_hold = 5,
+                       hazard = c(0.1, 0.09, 0.08, 0.07),
+                       orr = c(0.2, 0.25, 0.30, 0.40), rho = 0.7,
+                       dropout = c(0, 0, 0, 0), a1 = 1, a2 = 1,
+                       min_followup = 4,
                        targetEventsIA_all = 240, targetEventsFA_all = 320,
                        w = NULL, bound_z = c(2.44, 2),
                        alpha = 0.025, update_bound = TRUE,
@@ -58,7 +61,6 @@ getOC_ph23 <- function(ith = 1, seed = 2024, nsim = 1000, test.method = "dunnett
   bound_z_FA <- bound_z[2]
 
   ## Start simulation
-  set.seed(seed*ith)
   results.names <- c("Selected dose", "IA time", "IA reject", "FA reject", "FA time",
                      "Study duration", "Total sample size", "observed correlation",
                      "actual FA boundary")
@@ -67,22 +69,19 @@ getOC_ph23 <- function(ith = 1, seed = 2024, nsim = 1000, test.method = "dunnett
 
   for(sim in 1:nsim){
     ## Simulate survival times and tumor responses
-    num_trt <- length(hazardT)
-    dat <- sim_ph23(hazardC = hazardC, hazardT = hazardT,
-                    orrC = orrC, orrT = orrT, rho = rho,
-                    accrual_rate_stage1 = accrual_rate_stage1,
-                    accrual_rate_stage2 = accrual_rate_stage2,
-                    n1_per_arm = n1_per_arm, n2_per_arm = n2_per_arm,
-                    dropoutC = dropoutC, dropoutT = dropoutT)
+    num_trt <- length(hazard)-1
+    dat <- sim_ph23(n1 = n1, n2 = n2, duration1 = duration1, duration2 = duration2,
+                    enrollment_hold = enrollment_hold, hazard = hazard,
+                    orr = orr, rho = rho, dropout = dropout, a1 = a1, a2 = a2)
 
     ## dose selection
     d1 <- dat %>% filter(.data$stage==1)
+    IAd_time <- duration1 + min_followup
     if(dose_selection_endpoint == "ORR"){
       orr_est <- d1 %>% filter(.data$trt!=0) %>%
         group_by(.data$trt) %>% summarise(orr = mean(.data$response))
       selected <- orr_est$trt[which.max(orr_est$orr)]
     }else{
-      IAd_time <- max(d1$enterTime) + 1e-10
       d1IAd <- cut_by_date(d1, cut_time = IAd_time)
       pvalues <- rep(NA, num_trt)
       for(i in 1:num_trt){
@@ -94,13 +93,18 @@ getOC_ph23 <- function(ith = 1, seed = 2024, nsim = 1000, test.method = "dunnett
       selected <- which.min(pvalues)
     }
 
-    ## non-selected arms will be cut at nonselected_max_followup time
-    dat2 <- cut_nonselected_arms(dat = dat, selected = selected,
-                                 nonselected_max_followup = nonselected_max_followup)
+    ## non-selected arms will be cut at IAd_time or nonselected_max_followup (if specified)
+    if(is.null(nonselected_max_followup)){
+      dat2 <- cut_nonselected_arms(dat = dat, selected = selected,
+                                   nonselected_max_followup = IAd_time)
+    }else{
+      dat2 <- cut_nonselected_arms(dat = dat, selected = selected,
+                                   nonselected_max_followup = nonselected_max_followup)
+    }
 
     ## IA
     if(approach=="ii"){
-      res_IA <- getZ1(dat = dat2, w = w[1], selected = selected, targetEvents = targetEventsIA_all,
+      res_IA <- getZ1(dat = dat2, IAd_time = IAd_time, w = w[1], selected = selected, targetEvents = targetEventsIA_all,
                       test.method = test.method)
     }else{
       res_IA <- getZstat(dat = dat2, w = w[1], selected = selected, targetEvents = targetEventsIA_all,
@@ -146,7 +150,7 @@ getOC_ph23 <- function(ith = 1, seed = 2024, nsim = 1000, test.method = "dunnett
                                  group = as.factor(dFA$trt))
         z_FA <- res$z
         z_FA_tilde <- z_FA + sqrt(obsEventsIA/obsEventsFA)*(z_IA_tilde-z_IA)
-        FA_sample_size <- nrow(dFA) + (num_trt-1)*n1_per_arm
+        FA_sample_size <- nrow(dFA) + sum((n1[-1])[-selected])
         obs_cor <- sqrt(obsEventsIA/obsEventsFA)
       }
       if(update_bound){

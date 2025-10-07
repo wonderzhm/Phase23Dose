@@ -3,11 +3,8 @@
 #' @importFrom stats qnorm
 
 ## non-selected arms will be cut at dose selection time
-cut_nonselected_arms <- function(dat, selected, nonselected_max_followup=NULL){
+cut_nonselected_arms <- function(dat, selected, nonselected_max_followup){
   d1 <- dat %>% filter(.data$stage==1)
-  if(is.null(nonselected_max_followup)){
-    nonselected_max_followup <- max(d1$enterTime) + 1e-10
-  }
   d1nonselected <- d1 %>% filter(!(.data$trt%in%c(0, selected)))
   dremaining <- dat %>% filter((.data$trt%in%c(0, selected)))
   d1nonselected_cut <- cut_by_date(d1nonselected, nonselected_max_followup)
